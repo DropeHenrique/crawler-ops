@@ -1,0 +1,148 @@
+name: crawler-ops
+
+x-aws-env: &aws-env
+  AWS_ENDPOINT_URL: http://localstack:4566
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  S3_BUCKET: capture-data
+  SQS_QUEUE_URL: http://localstack:4566/000000000000/capture-jobs
+  SQS_DLQ_URL: http://localstack:4566/000000000000/capture-jobs-dlq
+  SNS_ALERTS_TOPIC_ARN: arn:aws:sns:us-east-1:000000000000:capture-alerts
+  DATABASE_URL: postgresql://crawlerops:crawlerops@postgres:5432/crawlerops
+  TARGET_BASE_URL: http://target-site:8081
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-app: &app
+  image: crawler-ops-app:local
+  build: .
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    localstack:
+      condition: service_healthy
+
+services:
+  # ---------- Infraestrutura (simula RDS + AWS) ----------
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: crawlerops
+      POSTGRES_PASSWORD: crawlerops
+      POSTGRES_DB: crawlerops
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crawlerops -d crawlerops"]
+      interval: 5s
+      retries: 20
+
+  localstack:
+    # 4.14.0 é a última versão community que roda sem token de autenticação.
+    image: localstack/localstack:4.14.0
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,sqs,sns,lambda,iam,sts,logs
+      LAMBDA_DOCKER_NETWORK: crawler-ops_default
+      MONITOR_URL: http://monitor:8090
+    volumes:
+      - ./infra/localstack/init:/etc/localstack/init/ready.d:ro
+      - ./lambdas:/opt/lambdas:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3api head-object --bucket capture-data --key _bootstrap/ready > /dev/null"]
+      interval: 5s
+      retries: 60
+
+  # ---------- Site-alvo com injeção de falhas ----------
+  target-site:
+    build: ./services/target_site
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  # ---------- Plataforma de captura ----------
+  crawler-worker:
+    <<: *app
+    command: ["python", "-m", "crawlerops.crawler.worker"]
+    environment:
+      <<: *aws-env
+      METRICS_PORT: "9100"
+    deploy:
+      replicas: 2
+
+  monitor:
+    <<: *app
+    command: ["uvicorn", "crawlerops.monitor.api:app", "--host", "0.0.0.0", "--port", "8090"]
+    environment:
+      <<: *aws-env
+      EVALUATION_INTERVAL_SECONDS: "20"
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    ports:
+      - "8090:8090"
+
+  # Agendador simples (alternativa leve ao Airflow).
+  scheduler:
+    <<: *app
+    profiles: ["lite"]
+    command: ["python", "-m", "crawlerops.scheduler.lite"]
+    environment:
+      <<: *aws-env
+      CAPTURE_INTERVAL_SECONDS: ${CAPTURE_INTERVAL_SECONDS:-60}
+
+  # ---------- Orquestração (diferencial da vaga) ----------
+  airflow:
+    image: apache/airflow:3.3.2-python3.12
+    profiles: ["airflow"]
+    command: ["standalone"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      <<: *aws-env
+      PYTHONPATH: /opt/crawlerops/src
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://crawlerops:crawlerops@postgres:5432/airflow
+      AIRFLOW_CONN_CRAWLEROPS_DB: postgresql://crawlerops:crawlerops@postgres:5432/crawlerops
+      MONITOR_URL: http://monitor:8090
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./src:/opt/crawlerops/src:ro
+
+  # ---------- Observabilidade ----------
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: ["observability"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    profiles: ["observability"]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  pgdata:

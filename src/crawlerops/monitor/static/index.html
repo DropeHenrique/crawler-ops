@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrawlerOps · Central de Sustentação</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #121826; --panel-2: #172033; --border: #24304a;
+    --text: #e6ebf5; --muted: #8a96ad; --accent: #5b8cff;
+    --ok: #22c55e; --p1: #ef4444; --p2: #f97316; --p3: #eab308;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; justify-content: space-between;
+           padding: 18px 28px; border-bottom: 1px solid var(--border); background: #0e1320; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+  header h1 span { color: var(--accent); }
+  .meta { color: var(--muted); font-size: 12px; display: flex; gap: 14px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  main { padding: 24px 28px 60px; display: grid; gap: 20px; max-width: 1500px; margin: 0 auto; }
+  .grid { display: grid; gap: 16px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .two { grid-template-columns: 2fr 1fr; }
+  @media (max-width: 1100px) { .two { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .kpi .value { font-size: 28px; font-weight: 700; }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi.p1 .value { color: var(--p1); } .kpi.p2 .value { color: var(--p2); } .kpi.p3 .value { color: var(--p3); }
+  .sources { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .source { border-left: 4px solid var(--ok); }
+  .source.P1 { border-left-color: var(--p1); } .source.P2 { border-left-color: var(--p2); } .source.P3 { border-left-color: var(--p3); }
+  .source .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .source .name { font-size: 16px; font-weight: 700; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 16px; }
+  .stat small { color: var(--muted); }
+  .errors { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .3px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+  .badge.P1 { background: #3a1214; color: #fca5a5; border-color: #7f1d1d; }
+  .badge.P2 { background: #3a1d0c; color: #fdba74; border-color: #7c2d12; }
+  .badge.P3 { background: #352d0a; color: #fde047; border-color: #713f12; }
+  .badge.ok, .badge.success, .badge.met, .badge.on_track { background: #0e2a1a; color: #86efac; border-color: #14532d; }
+  .badge.failed, .badge.breached, .badge.late { background: #3a1214; color: #fca5a5; border-color: #7f1d1d; }
+  .badge.at_risk, .badge.pending { background: #352d0a; color: #fde047; border-color: #713f12; }
+  .badge.open { color: #fca5a5; } .badge.acknowledged { color: #93c5fd; } .badge.resolved { color: #86efac; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+  tr.clickable { cursor: pointer; } tr.clickable:hover { background: var(--panel-2); }
+  .muted { color: var(--muted); }
+  .mono { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 12px; }
+  button, select, input, textarea { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  button { cursor: pointer; font-weight: 600; transition: .15s; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  button.danger { border-color: #7f1d1d; color: #fca5a5; }
+  button.small { padding: 4px 8px; font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chaos-state { margin-top: 12px; display: grid; gap: 6px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tabs button.active { background: var(--accent); border-color: var(--accent); color: white; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); width: min(760px, 94vw); padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .dlg-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; }
+  .dlg-body { padding: 16px 20px; display: grid; gap: 14px; max-height: 70vh; overflow: auto; }
+  .timeline { border-left: 2px solid var(--border); padding-left: 14px; display: grid; gap: 10px; }
+  .timeline .ev small { color: var(--muted); }
+  pre { background: var(--panel-2); padding: 10px; border-radius: 8px; overflow: auto; margin: 0; font-size: 12px; }
+  textarea { width: 100%; min-height: 70px; }
+  .empty { color: var(--muted); padding: 14px 0; text-align: center; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel-2); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; opacity: 0; transition: .25s; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Crawler<span>Ops</span> · Central de Sustentação</h1>
+  <div class="meta">
+    <span><span class="dot"></span>atualização automática (5s)</span>
+    <span id="last-eval">—</span>
+    <a href="/docs" style="color:var(--accent)">API</a>
+  </div>
+</header>
+
+<main>
+  <section class="grid kpis" id="kpis"></section>
+
+  <section class="grid sources" id="sources"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2>Incidentes</h2>
+        <div class="tabs">
+          <button data-status="active" class="active">Ativos</button>
+          <button data-status="resolved">Resolvidos</button>
+          <button data-status="all">Todos</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Sev.</th><th>Título</th><th>Status</th><th>SLA resposta</th><th>SLA resolução</th><th></th></tr></thead>
+        <tbody id="incidents"></tbody>
+      </table>
+    </div>
+
+    <div class="grid" style="align-content:start">
+      <div class="card">
+        <h2>Laboratório de falhas (chaos)</h2>
+        <div class="row">
+          <select id="chaos-source"><option value="all">todas</option><option value="alpha">alpha</option><option value="beta">beta</option></select>
+          <select id="chaos-mode"></select>
+          <input id="chaos-prob" type="number" min="0" max="1" step="0.1" value="1" style="width:70px" title="probabilidade">
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="primary" onclick="applyChaos()">Injetar falha</button>
+          <button onclick="resetChaos()">Normalizar tudo</button>
+        </div>
+        <div class="chaos-state" id="chaos-state"></div>
+      </div>
+
+      <div class="card">
+        <h2>Filas SQS</h2>
+        <div class="stats" id="queues"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="danger" onclick="redrive()">Redrive da DLQ</button>
+          <button onclick="showDlq()">Ver mensagens</button>
+          <button onclick="evaluate()">Avaliar agora</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Política de SLA</h2>
+        <table id="sla-policy"></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Execuções recentes</h2>
+    <table>
+      <thead><tr><th>Quando</th><th>Fonte</th><th>Alvo</th><th>Status</th><th>Erro</th><th>Tentativa</th><th>Itens</th><th>Duração</th><th>Worker</th></tr></thead>
+      <tbody id="runs"></tbody>
+    </table>
+  </section>
+</main>
+
+<dialog id="dlg"><div class="dlg-head"><div id="dlg-title"></div><button class="small" onclick="dlg.close()">Fechar</button></div><div class="dlg-body" id="dlg-body"></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const dlg = $("dlg");
+let incidentStatus = "active";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (v) => v == null ? "—" : `${Math.round(v * 100)}%`;
+const time = (iso) => iso ? new Date(iso).toLocaleTimeString("pt-BR") : "—";
+const dur = (s) => {
+  if (s == null) return "—";
+  const neg = s < 0; s = Math.abs(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const txt = h ? `${h}h${String(m).padStart(2, "0")}m` : m ? `${m}m${String(sec).padStart(2, "0")}s` : `${sec}s`;
+  return neg ? `-${txt}` : txt;
+};
+const SLA_LABEL = { met: "cumprido", late: "fora do prazo", pending: "aguardando", breached: "ESTOURADO", on_track: "no prazo", at_risk: "em risco" };
+const STATUS_LABEL = { open: "aberto", acknowledged: "em atendimento", resolved: "resolvido" };
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) { const body = await res.text(); throw new Error(`${res.status}: ${body}`); }
+  return res.json();
+}
+
+function author() {
+  let a = localStorage.getItem("author");
+  if (!a) { a = prompt("Seu nome (registrado no histórico do incidente):", "plantonista"); if (a) localStorage.setItem("author", a); }
+  return a;
+}
+
+async function loadOverview() {
+  const o = await api("/api/overview");
+  const q = o.queues;
+  $("kpis").innerHTML = [
+    ["p1", o.incidents.P1, "Incidentes P1"], ["p2", o.incidents.P2, "Incidentes P2"], ["p3", o.incidents.P3, "Incidentes P3"],
+    ["", q ? q.main.visible : "—", "Jobs na fila"], ["", q ? q.main.in_flight : "—", "Jobs em processamento"],
+    [q && q.dlq.visible ? "p2" : "", q ? q.dlq.visible : "—", "Mensagens na DLQ"],
+  ].map(([cls, v, l]) => `<div class="card kpi ${cls}"><div class="value">${v}</div><div class="label">${l}</div></div>`).join("");
+
+  $("sources").innerHTML = o.sources.map((s) => `
+    <div class="card source ${s.health}">
+      <div class="head"><span class="name">${esc(s.source)}</span>
+        <span class="badge ${s.health}">${s.health === "ok" ? "SAUDÁVEL" : s.health}</span></div>
+      <div class="stats">
+        <div class="stat"><b>${pct(s.success_rate)}</b><small>sucesso (${o.window_minutes} min)</small></div>
+        <div class="stat"><b>${s.freshness_s == null ? "—" : dur(s.freshness_s)}</b><small>desde o último dado</small></div>
+        <div class="stat"><b>${s.p95_success_ms == null ? "—" : (s.p95_success_ms / 1000).toFixed(1) + "s"}</b><small>latência p95</small></div>
+        <div class="stat"><b>${s.total}</b><small>execuções</small></div>
+        <div class="stat"><b>${s.items}</b><small>produtos válidos</small></div>
+        <div class="stat"><b>${s.invalid_items}</b><small>descartados</small></div>
+      </div>
+      <div class="errors">${Object.entries(s.errors).map(([k, v]) => `<span class="badge failed">${esc(k)} × ${v}</span>`).join("") || '<span class="muted">sem erros na janela</span>'}</div>
+    </div>`).join("");
+
+  $("queues").innerHTML = q ? `
+    <div class="stat"><b>${q.main.visible}</b><small>capture-jobs</small></div>
+    <div class="stat"><b>${q.main.in_flight}</b><small>em voo</small></div>
+    <div class="stat"><b>${q.dlq.visible}</b><small>capture-jobs-dlq</small></div>` : '<span class="muted">SQS indisponível</span>';
+
+  $("sla-policy").innerHTML = "<tr><th>Sev.</th><th>Resposta</th><th>Resolução</th></tr>" +
+    Object.entries(o.sla_policy).map(([sev, p]) => `<tr><td><span class="badge ${sev}">${sev}</span></td><td>${p.response_min} min</td><td>${p.resolution_h} h</td></tr>`).join("");
+
+  const le = o.last_evaluation;
+  $("last-eval").textContent = le && le.at ? `última avaliação ${time(le.at)}` : "aguardando avaliação";
+}
+
+async function loadIncidents() {
+  const list = await api(`/api/incidents?status=${incidentStatus}`);
+  $("incidents").innerHTML = list.length ? list.map((i) => `
+    <tr class="clickable" onclick="openIncident(${i.id})">
+      <td class="mono">${i.id}</td>
+      <td><span class="badge ${i.severity}">${i.severity}</span></td>
+      <td>${esc(i.title)}<br><small class="muted">${esc(i.rule)} · aberto ${time(i.opened_at)} · ${i.occurrences}× detectado</small></td>
+      <td><span class="badge ${i.status}">${STATUS_LABEL[i.status]}</span></td>
+      <td><span class="badge ${i.sla.response}">${SLA_LABEL[i.sla.response]}</span></td>
+      <td><span class="badge ${i.sla.resolution}">${SLA_LABEL[i.sla.resolution]}</span>
+          ${i.sla.resolution_remaining_s != null ? `<br><small class="muted">${dur(i.sla.resolution_remaining_s)} restantes</small>` : ""}</td>
+      <td onclick="event.stopPropagation()">
+        ${i.status === "open" ? `<button class="small" onclick="ack(${i.id})">Assumir</button>` : ""}
+        ${i.status !== "resolved" ? `<button class="small" onclick="resolveInc(${i.id})">Resolver</button>` : ""}
+      </td>
+    </tr>`).join("") : `<tr><td colspan="7" class="empty">Nenhum incidente ${incidentStatus === "active" ? "ativo" : "encontrado"}</td></tr>`;
+}
+
+async function loadRuns() {
+  const runs = await api("/api/runs?limit=25");
+  $("runs").innerHTML = runs.map((r) => `
+    <tr>
+      <td class="mono">${time(r.finished_at)}</td>
+      <td>${esc(r.source)}</td>
+      <td class="mono">${esc(r.target_url.replace(/^https?:\/\/[^/]+/, ""))}</td>
+      <td><span class="badge ${r.status}">${r.status}</span>${r.terminal ? "" : ' <small class="muted">(vai re-tentar)</small>'}</td>
+      <td>${r.error_type ? `<span class="badge failed" title="${esc(r.error_message)}">${esc(r.error_type)}</span>` : ""}</td>
+      <td>${r.attempt}</td>
+      <td>${r.items_count}${r.invalid_items ? ` <small class="muted">(+${r.invalid_items} inválidos)</small>` : ""}</td>
+      <td>${(r.duration_ms / 1000).toFixed(2)}s</td>
+      <td class="mono muted">${esc(r.worker_id)}</td>
+    </tr>`).join("") || '<tr><td colspan="9" class="empty">Nenhuma execução ainda</td></tr>';
+}
+
+async function loadChaos() {
+  try {
+    const c = await api("/api/chaos");
+    const sel = $("chaos-mode");
+    if (!sel.options.length) sel.innerHTML = Object.entries(c.modes).map(([m, d]) => `<option value="${m}" title="${esc(d)}">${m}</option>`).join("");
+    $("chaos-state").innerHTML = Object.entries(c.sources).map(([s, st]) =>
+      `<div class="row"><b style="width:50px">${s}</b><span class="badge ${st.mode === "none" ? "ok" : "P2"}">${st.mode}</span>
+       <small class="muted">${esc(c.modes[st.mode])}${st.mode !== "none" ? ` · p=${st.probability}` : ""}</small></div>`).join("");
+  } catch { $("chaos-state").innerHTML = '<span class="muted">site-alvo indisponível</span>'; }
+}
+
+async function refresh() {
+  await Promise.allSettled([loadOverview(), loadIncidents(), loadRuns(), loadChaos()]);
+}
+
+async function openIncident(id) {
+  const i = await api(`/api/incidents/${id}`);
+  $("dlg-title").innerHTML = `<span class="badge ${i.severity}">${i.severity}</span> <b>#${i.id} ${esc(i.title)}</b><br><small class="muted">${esc(i.fingerprint)} · ${STATUS_LABEL[i.status]}</small>`;
+  $("dlg-body").innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${time(i.opened_at)}</b><small>aberto</small></div>
+      <div class="stat"><b>${time(i.response_due_at)}</b><small>prazo de resposta</small></div>
+      <div class="stat"><b>${time(i.resolution_due_at)}</b><small>prazo de resolução</small></div>
+    </div>
+    <div><h2>Detalhes</h2><pre>${esc(JSON.stringify(i.details, null, 2))}</pre></div>
+    <div><h2>Linha do tempo</h2><div class="timeline">${i.events.map((e) =>
+      `<div class="ev"><b>${esc(e.kind)}</b> <small>${new Date(e.created_at).toLocaleString("pt-BR")} · ${esc(e.author)}</small><div>${esc(e.message)}</div></div>`).join("")}</div></div>
+    ${i.status !== "resolved" ? `
+    <div><h2>Registrar nota</h2><textarea id="note" placeholder="Ex.: verificado HTML bruto no S3; seletor .product-card não existe mais..."></textarea>
+      <div class="row" style="margin-top:8px"><button onclick="addNote(${i.id})">Adicionar nota</button></div></div>` : `<div><h2>Resolução</h2><pre>${esc(i.resolution_notes)} (por ${esc(i.resolved_by)})</pre></div>`}`;
+  if (!dlg.open) dlg.showModal();
+}
+
+async function ack(id) {
+  const a = author(); if (!a) return;
+  try { await api(`/api/incidents/${id}/ack`, { method: "POST", body: JSON.stringify({ author: a }) }); toast(`Incidente #${id} assumido`); refresh(); }
+  catch (e) { toast(e.message); }
+}
+
+async function resolveInc(id) {
+  const a = author(); if (!a) return;
+  const notes = prompt("Causa raiz e ação tomada (mín. 10 caracteres):");
+  if (!notes) return;
+  try { await api(`/api/incidents/${id}/resolve`, { method: "POST", body: JSON.stringify({ author: a, notes }) }); toast(`Incidente #${id} resolvido`); refresh(); }
+  catch (e) { toast(e.message); }
+}
+
+async function addNote(id) {
+  const a = author(); const message = $("note").value.trim();
+  if (!a || !message) return;
+  await api(`/api/incidents/${id}/notes`, { method: "POST", body: JSON.stringify({ author: a, message }) });
+  openIncident(id);
+}
+
+async function applyChaos() {
+  const body = { source: $("chaos-source").value, mode: $("chaos-mode").value, probability: Number($("chaos-prob").value) };
+  await api("/api/chaos", { method: "POST", body: JSON.stringify(body) });
+  toast(`Falha '${body.mode}' injetada em ${body.source}`); loadChaos();
+}
+
+async function resetChaos() { await api("/api/chaos/reset", { method: "POST" }); toast("Site-alvo normalizado"); loadChaos(); }
+
+async function redrive() {
+  if (!confirm("Reprocessar todas as mensagens da DLQ? Faça isso só depois de corrigir a causa.")) return;
+  const r = await api("/api/dlq/redrive", { method: "POST", body: JSON.stringify({ limit: 500 }) });
+  toast(`${r.moved} mensagem(ns) devolvida(s) à fila`); refresh();
+}
+
+async function showDlq() {
+  const d = await api("/api/dlq");
+  $("dlg-title").innerHTML = `<b>DLQ · capture-jobs-dlq</b><br><small class="muted">${d.depth.visible} mensagens (amostra de até 10)</small>`;
+  $("dlg-body").innerHTML = d.sample.length ? d.sample.map((m) =>
+    `<pre>${esc(JSON.stringify({ attributes: m.attributes, body: JSON.parse(m.body) }, null, 2))}</pre>`).join("") : '<div class="empty">DLQ vazia</div>';
+  if (!dlg.open) dlg.showModal();
+}
+
+async function evaluate() { const r = await api("/api/evaluate", { method: "POST" }); toast(`Avaliação: ${r.findings} achado(s)`); refresh(); }
+
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("active"));
+  b.classList.add("active"); incidentStatus = b.dataset.status; loadIncidents();
+}));
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

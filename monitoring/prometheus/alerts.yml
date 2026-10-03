@@ -1,0 +1,39 @@
+groups:
+  - name: captura
+    rules:
+      - alert: CapturaIndisponivel
+        expr: monitor_source_success_rate < 0.5
+        for: 2m
+        labels: { severity: P1 }
+        annotations:
+          summary: "Taxa de sucesso de {{ $labels.source }} abaixo de 50%"
+          runbook: docs/runbooks/captura-indisponivel.md
+
+      - alert: DadosDesatualizados
+        expr: monitor_data_freshness_seconds > 600
+        for: 1m
+        labels: { severity: P1 }
+        annotations:
+          summary: "{{ $labels.source }} sem captura bem-sucedida há mais de 10 minutos"
+          runbook: docs/runbooks/dados-desatualizados.md
+
+      - alert: MensagensNaDLQ
+        expr: monitor_queue_depth{queue="capture-jobs-dlq"} > 0
+        for: 1m
+        labels: { severity: P3 }
+        annotations:
+          summary: "{{ $value }} mensagens na DLQ"
+          runbook: docs/runbooks/dlq.md
+
+      - alert: WorkerSemMetricas
+        expr: up{job="crawler-worker"} == 0
+        for: 1m
+        labels: { severity: P1 }
+        annotations:
+          summary: "Worker {{ $labels.instance }} fora do ar"
+
+      - alert: SLAEstourado
+        expr: monitor_sla_breached_incidents > 0
+        labels: { severity: P1 }
+        annotations:
+          summary: "{{ $value }} incidente(s) com SLA de resolução estourado"

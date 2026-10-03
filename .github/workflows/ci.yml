@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências
+        run: uv pip install --system -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Testes
+        run: pytest --cov=crawlerops --cov-report=term-missing --cov-fail-under=60
+      - name: Validar sintaxe da DAG
+        run: python -m py_compile airflow/dags/*.py
+
+  build:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build da imagem da aplicação (worker/monitor/scheduler)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: crawler-ops-app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build do site-alvo
+        run: docker build -t target-site:${{ github.sha }} services/target_site
+
+  # Em produção: push para o ECR e update do serviço ECS (rolling deploy).
+  # deploy:
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - aws-actions/configure-aws-credentials (OIDC)
+  #     - aws-actions/amazon-ecr-login
+  #     - docker push <conta>.dkr.ecr.<região>.amazonaws.com/crawler-ops:${{ github.sha }}
+  #     - aws-actions/amazon-ecs-deploy-task-definition (serviço crawler-worker)

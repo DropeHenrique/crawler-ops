@@ -1,0 +1,65 @@
+{
+  "uid": "crawlerops",
+  "title": "CrawlerOps - Sustentação de Capturas",
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "type": "stat", "title": "Incidentes ativos", "gridPos": { "x": 0, "y": 0, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "monitor_open_incidents", "legendFormat": "{{severity}}" }],
+      "options": { "colorMode": "background", "textMode": "value_and_name" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } }
+    },
+    {
+      "type": "stat", "title": "Mensagens nas filas", "gridPos": { "x": 8, "y": 0, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "monitor_queue_depth", "legendFormat": "{{queue}}" }],
+      "options": { "textMode": "value_and_name" }
+    },
+    {
+      "type": "stat", "title": "SLA estourado", "gridPos": { "x": 16, "y": 0, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "monitor_sla_breached_incidents" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } }
+    },
+    {
+      "type": "timeseries", "title": "Taxa de sucesso por fonte", "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "monitor_source_success_rate", "legendFormat": "{{source}}" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    },
+    {
+      "type": "timeseries", "title": "Capturas por status (req/min)", "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (source, status, error_type) (rate(crawler_captures_total[2m])) * 60",
+                    "legendFormat": "{{source}} {{status}} {{error_type}}" }]
+    },
+    {
+      "type": "timeseries", "title": "Latência p95 da captura", "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, source) (rate(crawler_capture_duration_seconds_bucket[5m])))",
+                    "legendFormat": "{{source}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries", "title": "Freshness dos dados", "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "monitor_data_freshness_seconds", "legendFormat": "{{source}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries", "title": "Produtos capturados vs descartados (por min)", "gridPos": { "x": 0, "y": 20, "w": 24, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (source) (rate(crawler_items_captured_total[2m])) * 60", "legendFormat": "válidos {{source}}" },
+        { "expr": "sum by (source) (rate(crawler_invalid_items_total[2m])) * 60", "legendFormat": "inválidos {{source}}" }
+      ]
+    }
+  ]
+}
